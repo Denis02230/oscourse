@@ -105,7 +105,7 @@ InitGraphics (
   }
 
   //
-  // LAB 1: Your code here.
+  // LAB 1: My code here:
   //
   // Switch to the maximum or any other resolution of your preference.
   // Refer to Graphics Output Protocol description in UEFI spec for
@@ -113,6 +113,59 @@ InitGraphics (
   //
   // Hint: Use QueryMode/SetMode functions.
   //
+
+  if (GraphicsOutput->Mode->MaxMode < 1) {
+    DEBUG ((DEBUG_ERROR, "JOS: GOP protocol has no modes\n"));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  BOOLEAN FoundTargetMode = FALSE;
+  UINT32 Mode;
+
+  EFI_GRAPHICS_PIXEL_FORMAT CurrentPixelFormat = PixelBlueGreenRedReserved8BitPerColor;
+  UINT32 HorizontalResolution = 2560;
+  UINT32 VerticalResolution = 1440;
+
+  for (Mode = 0; Mode < GraphicsOutput->Mode->MaxMode - 1; Mode++) {
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
+    UINTN SizeOfInfo;
+    
+    Status = GraphicsOutput->QueryMode(
+      GraphicsOutput,
+      Mode,
+      &SizeOfInfo,
+      &Info
+    );
+
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "JOS: Cannot query GOP protocol mode - %r\n", Status));
+      return Status;
+    }
+
+    DEBUG ((DEBUG_VERBOSE, "JOS: Mode %u: %ux%ux%u\n", Mode, Info->HorizontalResolution, Info->VerticalResolution, Info->PixelFormat));
+
+    if (CurrentPixelFormat == Info->PixelFormat
+    && VerticalResolution == Info->VerticalResolution
+    && HorizontalResolution == Info->HorizontalResolution) {
+      DEBUG ((DEBUG_VERBOSE, "JOS: Matched %u mode\n", Mode));
+      FoundTargetMode = TRUE;
+      break;
+    }
+  }
+
+  if (!FoundTargetMode) {
+    DEBUG ((DEBUG_ERROR, "JOS: Cannot find matching GOP protocol mode, defaulting to last\n"));
+  }
+
+  Status = GraphicsOutput->SetMode(
+    GraphicsOutput,
+    Mode
+  );
+
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "JOS: Cannot set GOP protocol mode - %r\n", Status));
+    return Status;
+  }
 
   //
   // Fill screen with black.
@@ -274,8 +327,13 @@ GetKernelFile (
   // (use gEfiLoadedImageProtocolGuid) from gImageHandle to
   // get loader's containing device.
   //
-  // LAB 1: Your code here
-  (void)LoadedImage;
+  // LAB 1: My code here:
+
+  Status = gBS->HandleProtocol(
+    gImageHandle,
+    &gEfiLoadedImageProtocolGuid,
+    (VOID**) &LoadedImage
+  );
 
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "JOS: Cannot find LoadedImage protocol - %r\n", Status));
@@ -292,8 +350,13 @@ GetKernelFile (
   // (use gEfiSimpleFileSystemProtocolGuid) from LoadedImage->DeviceHandle
   // to read the kernel from it later.
   //
-  // LAB 1: Your code here
-  (void)FileSystem;
+  // LAB 1: My code here:
+
+  Status = gBS->HandleProtocol(
+    LoadedImage->DeviceHandle,
+    &gEfiSimpleFileSystemProtocolGuid,
+    (VOID**) &FileSystem
+  );
 
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "JOS: Cannot find own FileSystem protocol - %r\n", Status));
@@ -304,8 +367,12 @@ GetKernelFile (
   // Use FileSystem->OpenVolume() to open root directory, in which kernel is stored
   // NOTE: Don't forget to Use ->Close after you've done using it.
   //
-  // LAB 1: Your code here
-  (void)CurrentDriveRoot;
+  // LAB 1: My code here:
+
+  Status = FileSystem->OpenVolume(
+    FileSystem,
+    &CurrentDriveRoot
+  );
 
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "JOS: Cannot access own file system - %r\n", Status));
@@ -316,11 +383,27 @@ GetKernelFile (
   // Use ->Open to open kernel file located at KERNEL_PATH
   // for reading (as EFI_FILE_MODE_READ)
   //
-  // LAB 1: Your code here
-  KernelFile = NULL;
+  // LAB 1: My code here:
+
+  Status = CurrentDriveRoot->Open(
+    CurrentDriveRoot,
+    &KernelFile,
+    KERNEL_PATH,
+    EFI_FILE_MODE_READ,
+    EFI_FILE_READ_ONLY
+  );
 
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "JOS: Cannot access own file system - %r\n", Status));
+    return Status;
+  }
+
+  Status = CurrentDriveRoot->Close(
+    CurrentDriveRoot
+  );
+
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "JOS: Cannot close root directory - %r\n", Status));
     return Status;
   }
 
@@ -987,7 +1070,7 @@ UefiMain (
   UINTN              EntryPoint;
   VOID               *GateData;
 
-#if 1 ///< Uncomment to await debugging
+#if 0 ///< Change to await debugging
   volatile BOOLEAN   Connected;
   DEBUG ((DEBUG_INFO, "JOS: Awaiting debugger connection\n"));
 
