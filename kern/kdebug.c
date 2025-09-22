@@ -65,7 +65,12 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
      * address of the next instruction, so we should substract 5 from it.
      * Hint: use line_for_address from kern/dwarf_lines.c */
 
-    // LAB 2: Your res here:
+    // LAB 2: My code here:
+    // we want addr to be pointing to the current instruction, not the next one
+    addr -= CALL_INSN_LEN;
+
+    res = line_for_address(&addrs, addr, line_offset, &info->rip_line);
+    if (res < 0) goto error;
 
     /* Find function name corresponding to given address.
      * Hint: note that we need the address of `call` instruction, but rip holds
@@ -74,7 +79,13 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
      * Hint: info->rip_fn_name can be not NULL-terminated,
      * string returned by function_by_info will always be */
 
-    // LAB 2: Your res here:
+    // LAB 2: My code here:
+    res = function_by_info(&addrs, addr, offset, &tmp_buf, &info->rip_fn_addr);
+    if (res < 0) goto error;
+
+    int max_name_len = sizeof(info->rip_fn_name);
+    strncpy(info->rip_fn_name, tmp_buf, max_name_len);
+    info->rip_fn_namelen = strnlen(info->rip_fn_name, max_name_len);
 
 error:
     return res;

@@ -17,6 +17,7 @@
 
 /* Functions implementing monitor commands */
 int mon_help(int argc, char **argv, struct Trapframe *tf);
+int mon_helloworld(int argc, char **argv, struct Trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
 int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
 
@@ -29,6 +30,7 @@ struct Command {
 
 static struct Command commands[] = {
         {"help", "Display this list of commands", mon_help},
+        {"hw", "Print Hello World", mon_helloworld},
         {"kerninfo", "Display information about the kernel", mon_kerninfo},
         {"backtrace", "Print stack backtrace", mon_backtrace},
 };
@@ -40,6 +42,12 @@ int
 mon_help(int argc, char **argv, struct Trapframe *tf) {
     for (size_t i = 0; i < NCOMMANDS; i++)
         cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+    return 0;
+}
+
+int
+mon_helloworld(int argc, char **argv, struct Trapframe *tf) {
+    cprintf("hello world\n");
     return 0;
 }
 
@@ -59,7 +67,27 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
-    // LAB 2: Your code here
+    // LAB 2: My code here
+    cprintf("Stack backtrace:\n");
+
+    uint64_t rbp = read_rbp();
+
+    while (rbp) {
+        uint64_t rip = *((uint64_t *)(rbp + 8));
+        cprintf("  rbp %016lx  rip %016lx\n", rbp, rip);
+
+        struct Ripdebuginfo info;
+        if (debuginfo_rip((uintptr_t)rip, &info) == 0) {
+            cprintf("    %s:%d: %*.s+%lu\n",
+                    info.rip_file,
+                    info.rip_line,
+                    info.rip_fn_namelen,
+                    info.rip_fn_name,
+                    (uintptr_t)(rip - info.rip_fn_addr));
+        }
+
+        rbp = *((uint64_t *)(rbp));
+    }
 
     return 0;
 }
