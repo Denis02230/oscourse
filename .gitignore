@@ -8,6 +8,7 @@
 *.rej
 *.patch
 *.diff
+.vscode/
 /lib/random_data.c
 .DS_Store
 .gdb_history
