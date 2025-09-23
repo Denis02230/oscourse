@@ -149,8 +149,10 @@ InitGraphics (
     && HorizontalResolution == Info->HorizontalResolution) {
       DEBUG ((DEBUG_VERBOSE, "JOS: Matched %u mode\n", Mode));
       FoundTargetMode = TRUE;
+      FreePool(Info);
       break;
     }
+    FreePool(Info);
   }
 
   if (!FoundTargetMode) {
