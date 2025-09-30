@@ -100,7 +100,32 @@ find_function(const char *const fname) {
      * It may also be useful to look to kernel symbol table for symbols defined
      * in assembly. */
 
-    // LAB 3: Your code here:
+    // LAB 3: My code here:
+    uintptr_t offset = 0;
+    struct Dwarf_Addrs addrs;
+    load_kernel_dwarf_info(&addrs);
+
+    int res = address_by_fname(&addrs, fname, &offset);
+    if (!res) {
+        return offset;
+    }
+
+    res = naive_address_by_fname(&addrs, fname, &offset);
+    if (!res) {
+        return offset;
+    }
+
+    struct Elf64_Sym* symt;
+    char* strt = (char*) uefi_lp->StringTableStart;
+    
+    for (symt = (struct Elf64_Sym*) uefi_lp->SymbolTableStart; 
+        symt != (struct Elf64_Sym*) uefi_lp->SymbolTableEnd;
+        ++symt
+    ) {
+        if (!strcmp(&strt[symt->st_name], fname)) {
+            return symt->st_value;
+        }
+    }
 
     return 0;
 }
