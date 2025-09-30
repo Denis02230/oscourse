@@ -177,16 +177,15 @@ static int
 bind_functions(struct Env *env, uint8_t *binary, size_t size, uintptr_t image_start, uintptr_t image_end) {
     // LAB 3: My code here:
     /* NOTE: find_function from kdebug.c should be used */
-    struct Elf* elf = (struct Elf*) binary;
-    struct Secthdr* sh = (struct Secthdr*) (binary + elf->e_shoff);
-    char* sh_str = (char*) (binary + sh[elf->e_shstrndx].sh_offset);
+    struct Elf *elf = (struct Elf *)binary;
+    struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+    char *sh_str = (char *)(binary + sh[elf->e_shstrndx].sh_offset);
 
     uint16_t strtab_idx = UINT16_MAX;
     uint16_t symtab_idx = UINT16_MAX;
 
     for (uint16_t i = 0; i < elf->e_shnum; ++i) {
-        if (sh[i].sh_type == ELF_SHT_STRTAB
-            && !strcmp(&sh_str[sh[i].sh_name], ".strtab")) {
+        if (sh[i].sh_type == ELF_SHT_STRTAB && !strcmp(&sh_str[sh[i].sh_name], ".strtab")) {
             strtab_idx = i;
         }
         if (sh[i].sh_type == ELF_SHT_SYMTAB) {
@@ -198,22 +197,21 @@ bind_functions(struct Env *env, uint8_t *binary, size_t size, uintptr_t image_st
         panic("bind_functions: missing symtab or strtab\n");
     }
 
-    struct Elf64_Sym* symt = (struct Elf64_Sym*) (binary + sh[symtab_idx].sh_offset);
+    struct Elf64_Sym *symt = (struct Elf64_Sym *)(binary + sh[symtab_idx].sh_offset);
     size_t nsyms = sh[symtab_idx].sh_size / sizeof(struct Elf64_Sym);
-    const char* strtab = (char*) (binary + sh[strtab_idx].sh_offset);
+    const char *strtab = (char *)(binary + sh[strtab_idx].sh_offset);
 
     for (size_t i = 0; i < nsyms; ++i) {
-        if (ELF64_ST_BIND(symt[i].st_info) != STB_GLOBAL
-            || ELF64_ST_TYPE(symt[i].st_info) != STT_OBJECT) {
+        if (ELF64_ST_BIND(symt[i].st_info) != STB_GLOBAL || ELF64_ST_TYPE(symt[i].st_info) != STT_OBJECT) {
             continue;
         }
 
-        const char* name = (char*) (strtab + symt[i].st_name);
+        const char *name = (char *)(strtab + symt[i].st_name);
         uintptr_t addr = find_function(name);
         if (!addr) continue;
 
-        uintptr_t loc = (uintptr_t) symt[i].st_value;
-        memcpy((void*) loc, (void*) &addr, sizeof(addr));
+        uintptr_t loc = (uintptr_t)symt[i].st_value;
+        memcpy((void *)loc, (void *)&addr, sizeof(addr));
     }
 
     return 0;
@@ -262,16 +260,14 @@ bind_functions(struct Env *env, uint8_t *binary, size_t size, uintptr_t image_st
 static int
 load_icode(struct Env *env, uint8_t *binary, size_t size) {
     // LAB 3: My code here
-    struct Elf* elf = (struct Elf*) binary;
+    struct Elf *elf = (struct Elf *)binary;
 
-    if (elf->e_phentsize != sizeof(struct Proghdr)
-        || elf->e_shentsize != sizeof(struct Secthdr)
-        || elf->e_shstrndx >= elf->e_shnum) {
+    if (elf->e_phentsize != sizeof(struct Proghdr) || elf->e_shentsize != sizeof(struct Secthdr) || elf->e_shstrndx >= elf->e_shnum) {
         return -E_INVALID_EXE;
     }
 
-    struct Proghdr* ph = (struct Proghdr*) (binary + elf->e_phoff);
-    
+    struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
+
     uintptr_t image_start = (uintptr_t)binary;
     uintptr_t image_end = (uintptr_t)binary + size;
 
@@ -284,8 +280,8 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
         size_t offset = ph[i].p_offset;
         size_t filesz = ph[i].p_filesz;
 
-        memcpy((void*) va, (void*) (binary + offset), filesz);
-        memset((void*) (va + filesz), 0, memsz - filesz);
+        memcpy((void *)va, (void *)(binary + offset), filesz);
+        memset((void *)(va + filesz), 0, memsz - filesz);
     }
 
     env->env_tf.tf_rip = elf->e_entry;
@@ -306,7 +302,7 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
 void
 env_create(uint8_t *binary, size_t size, enum EnvType type) {
     // LAB 3: My code here
-    struct Env* env = NULL;
+    struct Env *env = NULL;
 
     int res = env_alloc(&env, 0, type);
     if (res) panic("env_create: env_alloc failed, %i", res);

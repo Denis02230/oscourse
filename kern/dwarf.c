@@ -573,14 +573,13 @@ address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname, uintptr_t *
                     do {
                         abbrev_entry += dwarf_read_uleb128(abbrev_entry, &name);
                         abbrev_entry += dwarf_read_uleb128(abbrev_entry, &form);
-                        
+
                         entry += dwarf_read_abbrev_entry(
-                            entry,
-                            form,
-                            name == DW_AT_low_pc ? &low_pc        : NULL,
-                            name == DW_AT_low_pc ? sizeof(low_pc) : 0,
-                            address_size
-                        );
+                                entry,
+                                form,
+                                name == DW_AT_low_pc ? &low_pc : NULL,
+                                name == DW_AT_low_pc ? sizeof(low_pc) : 0,
+                                address_size);
                     } while (name || form);
 
                     if (low_pc) {

@@ -115,13 +115,12 @@ find_function(const char *const fname) {
         return offset;
     }
 
-    struct Elf64_Sym* symt;
-    char* strt = (char*) uefi_lp->StringTableStart;
-    
-    for (symt = (struct Elf64_Sym*) uefi_lp->SymbolTableStart; 
-        symt != (struct Elf64_Sym*) uefi_lp->SymbolTableEnd;
-        ++symt
-    ) {
+    struct Elf64_Sym *symt;
+    char *strt = (char *)uefi_lp->StringTableStart;
+
+    for (symt = (struct Elf64_Sym *)uefi_lp->SymbolTableStart;
+         symt != (struct Elf64_Sym *)uefi_lp->SymbolTableEnd;
+         ++symt) {
         if (!strcmp(&strt[symt->st_name], fname)) {
             return symt->st_value;
         }
