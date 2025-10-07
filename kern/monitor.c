@@ -79,7 +79,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
 
         struct Ripdebuginfo info;
         if (debuginfo_rip((uintptr_t)rip, &info) == 0) {
-            cprintf("    %s:%d: %*.s+%lu\n",
+            cprintf("    %s:%d: %.*s+%lu\n",
                     info.rip_file,
                     info.rip_line,
                     info.rip_fn_namelen,
