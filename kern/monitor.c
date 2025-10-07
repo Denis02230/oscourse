@@ -97,7 +97,6 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     return 0;
 }
 
-// LAB 4: Your code here
 int
 mon_dumpcmos(int argc, char **argv, struct Trapframe *tf) {
     // Dump CMOS memory in the following format:
@@ -105,8 +104,22 @@ mon_dumpcmos(int argc, char **argv, struct Trapframe *tf) {
     // 10: 00 ..
     // Make sure you understand the values read.
     // Hint: Use cmos_read8()/cmos_write8() functions.
-    // LAB 4: Your code here
+    // LAB 4: My code here
+    for (uint8_t i = 0; i < CMOS_SIZE; i++) {
+        if (i % 16 == 0) {
+            cprintf("%02X: ", i);
+        }
 
+        cprintf("%02X ", cmos_read8(i));
+
+        if ((i + 1) % 16 == 0) {
+            cprintf("\n");
+        }
+    }
+
+    if (CMOS_SIZE % 16 != 0) {
+        cprintf("\n");
+    }
     return 0;
 }
 

@@ -22,16 +22,19 @@
 uint8_t
 cmos_read8(uint8_t reg) {
     /* MC146818A controller */
-    // LAB 4: Your code here
-    uint8_t res = 0;
-    nmi_enable();
+    // LAB 4: My code here
+    outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
+    uint8_t res = inb(CMOS_DATA);
+    outb(CMOS_CMD, reg & ~CMOS_NMI_LOCK);
     return res;
 }
 
 void
 cmos_write8(uint8_t reg, uint8_t value) {
-    // LAB 4: Your code here
-    nmi_enable();
+    // LAB 4: My code here
+    outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
+    outb(CMOS_DATA, value);
+    outb(CMOS_CMD, reg & ~CMOS_NMI_LOCK);
 }
 
 uint16_t
@@ -41,8 +44,9 @@ cmos_read16(uint8_t reg) {
 
 void
 rtc_timer_pic_interrupt(void) {
-    // LAB 4: Your code here
+    // LAB 4: My code here
     // Enable PIC interrupts.
+    pic_irq_unmask(IRQ_CLOCK);
 }
 
 void
@@ -53,13 +57,17 @@ rtc_timer_pic_handle(void) {
 
 void
 rtc_timer_init(void) {
-    // LAB 4: Your code here
+    // LAB 4: My code here
     // (use cmos_read8()/cmos_write8())
+    uint8_t areg = cmos_read8(RTC_AREG);
+    cmos_write8(RTC_AREG, areg | 0xF);
+    uint8_t breg = cmos_read8(RTC_BREG);
+    cmos_write8(RTC_BREG, breg | RTC_PIE);
 }
 
 uint8_t
 rtc_check_status(void) {
-    // LAB 4: Your code here
+    // LAB 4: My code here
     // (use cmos_read8())
-    return 0;
+    return cmos_read8(RTC_CREG);
 }
