@@ -191,7 +191,7 @@ print_timer_error(void) {
 /* Use print_time function to print timert result
  * Use print_timer_error function to print error. */
 
-// LAB 5: Your code here:
+// LAB 5: My code here:
 
 static bool timer_started = 0;
 static int timer_id = -1;
@@ -200,16 +200,59 @@ static uint64_t freq = 0;
 
 void
 timer_start(const char *name) {
-    (void)timer_started;
-    (void)timer_id;
-    (void)timer;
-    (void)freq;
+    timer_id = -1;
+
+    for (int i = 0; i < MAX_TIMERS; i++) {
+        if (timertab[i].timer_name &&
+            strncmp(name, timertab[i].timer_name, 6) == 0) {
+            timer_id = i;
+            break;
+        }
+    }
+
+    if (timer_id == -1) {
+        print_timer_error();
+        return;
+    }
+
+    freq = timertab[timer_id].get_cpu_freq();
+    if (!freq) {
+        print_timer_error();
+        return;
+    }
+
+    timer = read_tsc();
+    timer_started = true;
 }
 
 void
 timer_stop(void) {
+    if (!timer_started) {
+        print_timer_error();
+        return;
+    }
+
+    uint64_t tsc_end = read_tsc();
+    double elapsed_sec = (double)(tsc_end - timer) / (double)freq;
+
+    print_time(elapsed_sec);
+
+    timer_started = false;
+    timer_id = -1;
+    timer = 0;
+    freq = 0;
 }
 
 void
 timer_cpu_frequency(const char *name) {
+    for (int i = 0; i < MAX_TIMERS; i++) {
+        if (timertab[i].timer_name &&
+            strncmp(name, timertab[i].timer_name, 6) == 0) {
+            uint64_t freq = timertab[i].get_cpu_freq();
+            cprintf("%lu Hz\n", freq);
+            return;
+        }
+    }
+
+    print_timer_error();
 }
