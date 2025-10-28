@@ -207,11 +207,11 @@ bind_functions(struct Env *env, uint8_t *binary, size_t size, uintptr_t image_st
         }
 
         const char *name = (char *)(strtab + symt[i].st_name);
-        uintptr_t addr = find_function(name);
+        void (*addr)(void) = (void (*)(void))find_function(name);
         if (!addr) continue;
 
         uintptr_t loc = (uintptr_t)symt[i].st_value;
-        memcpy((void *)loc, (void *)&addr, sizeof(addr));
+        memcpy((void *)loc, (void *)&addr, sizeof(void (*)(void)));
     }
 
     return 0;
@@ -259,37 +259,63 @@ bind_functions(struct Env *env, uint8_t *binary, size_t size, uintptr_t image_st
  *   What?  (See env_run() and env_pop_tf() below.) */
 static int
 load_icode(struct Env *env, uint8_t *binary, size_t size) {
-    // LAB 3: My code here
-    struct Elf *elf = (struct Elf *)binary;
-
-    if (elf->e_phentsize != sizeof(struct Proghdr) || elf->e_shentsize != sizeof(struct Secthdr) || elf->e_shstrndx >= elf->e_shnum) {
+    if (!env || !binary || size < sizeof(struct Elf))
         return -E_INVALID_EXE;
-    }
+
+    struct Elf *elf = (struct Elf *)binary;
+    if (elf->e_magic != ELF_MAGIC)
+        return -E_INVALID_EXE;
+    if (elf->e_type != ET_EXEC && elf->e_type != ET_DYN)
+        return -E_INVALID_EXE;
+    if (elf->e_machine != EM_X86_64)
+        return -E_INVALID_EXE;
+    if (elf->e_phentsize != sizeof(struct Proghdr))
+        return -E_INVALID_EXE;
+    if (elf->e_phnum == 0)
+        return -E_INVALID_EXE;
+    if (elf->e_shentsize != sizeof(struct Secthdr))
+        return -E_INVALID_EXE;
+    if (elf->e_shstrndx >= elf->e_shnum)
+        return -E_INVALID_EXE;
+
+    uint64_t ph_size = (uint64_t)elf->e_phnum * elf->e_phentsize;
+    if (elf->e_phoff > size || elf->e_phoff + ph_size > size)
+        return -E_INVALID_EXE;
+    uint64_t sh_size = (uint64_t)elf->e_shnum * elf->e_shentsize;
+    if (elf->e_shoff > size || elf->e_shoff + sh_size > size)
+        return -E_INVALID_EXE;
 
     struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
+    for (uint16_t i = 0; i < elf->e_phnum; i++) {
+        if (ph[i].p_type != ELF_PROG_LOAD)
+            continue;
+        if (ph[i].p_filesz > ph[i].p_memsz)
+            return -E_INVALID_EXE;
+        if (ph[i].p_offset > size ||
+            ph[i].p_offset + ph[i].p_filesz > size)
+            return -E_INVALID_EXE;
+        if (ph[i].p_align && (ph[i].p_offset % ph[i].p_align) != (ph[i].p_va % ph[i].p_align))
+            return -E_INVALID_EXE;
+        uint64_t end = (uint64_t)ph[i].p_va + (uint64_t)ph[i].p_memsz;
+        if (end < ph[i].p_va)
+            return -E_INVALID_EXE;
+    }
 
     uintptr_t image_start = (uintptr_t)binary;
-    uintptr_t image_end = (uintptr_t)binary + size;
+    uintptr_t image_end = image_start + size;
 
-    for (uint16_t i = 0; i < elf->e_phnum; ++i) {
-        if (ph[i].p_type != ELF_PROG_LOAD) continue;
-        if (ph[i].p_filesz > ph[i].p_memsz) return -E_INVALID_EXE;
-
-        uintptr_t va = ph[i].p_va;
-        size_t memsz = ph[i].p_memsz;
-        size_t offset = ph[i].p_offset;
-        size_t filesz = ph[i].p_filesz;
-
-        memcpy((void *)va, (void *)(binary + offset), filesz);
-        memset((void *)(va + filesz), 0, memsz - filesz);
+    for (uint16_t i = 0; i < elf->e_phnum; i++) {
+        if (ph[i].p_type != ELF_PROG_LOAD)
+            continue;
+        if (ph[i].p_filesz > ph[i].p_memsz)
+            return -E_INVALID_EXE;
+        memcpy((void *)ph[i].p_va, binary + ph[i].p_offset, ph[i].p_filesz);
+        memset((void *)(ph[i].p_va + ph[i].p_filesz), 0, ph[i].p_memsz - ph[i].p_filesz);
     }
 
     env->env_tf.tf_rip = elf->e_entry;
-
-    if (image_start != (uintptr_t)-1 && image_end > image_start) {
+    if (image_start != (uintptr_t)-1 && image_end > image_start)
         bind_functions(env, binary, size, image_start, image_end);
-    }
-
     return 0;
 }
 
