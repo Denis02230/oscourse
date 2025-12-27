@@ -839,7 +839,7 @@ memcpy_page(struct AddressSpace *dst, uintptr_t va, struct Page *page) {
 
     set_wp(0);
     switch_address_space(dst);
-    nosan_memcpy(dst_va, src, PAGE_SIZE);
+    nosan_memcpy(dst_va, src, CLASS_SIZE(page->class));
     switch_address_space(old);
     set_wp(1);
 }
