@@ -277,6 +277,51 @@ sys_unmap_region(envid_t envid, uintptr_t va, size_t size) {
     return 0;
 }
 
+
+/* Map region of physical memory to the userspace address.
+ * This is meant to be used by the userspace drivers, of which
+ * the only one currently is the filesystem server.
+ *
+ * Return 0 on succeeds, < 0 on error. Erros are:
+ *  -E_BAD_ENV if environment envid doesn't currently exist,
+ *      or the caller doesn't have permission to change envid.
+ *  -E_BAD_ENV if is not a filesystem driver (ENV_TYPE_FS).
+ *  -E_INVAL if va >= MAX_USER_ADDRESS, or va is not page-aligned.
+ *  -E_INVAL if pa is not page-aligned.
+ *  -E_INVAL if size is not page-aligned.
+ *  -E_INVAL if prem contains invalid flags
+ *     (including PROT_SHARE, PROT_COMBINE or PROT_LAZY).
+ *  -E_NO_MEM if address does not exist.
+ *  -E_NO_ENT if address is already used. */
+static int
+sys_map_physical_region(uintptr_t pa, envid_t envid, uintptr_t va, size_t size, int perm)
+{
+    // LAB 10: Your code here
+    struct Env *env = NULL;
+    int res;
+
+    res = envid2env(envid, &env, 1);
+    if (res < 0)
+        return res;
+    if (env->env_type != ENV_TYPE_FS)
+        return -E_BAD_ENV;
+
+    if (va >= MAX_USER_ADDRESS)
+        return -E_INVAL;
+    if (PAGE_OFFSET(va) || PAGE_OFFSET(pa) || PAGE_OFFSET(size))
+        return -E_INVAL;
+    if (size == 0 || size > MAX_USER_ADDRESS)
+        return -E_INVAL;
+    if (MAX_USER_ADDRESS - va < size)
+        return -E_INVAL;
+
+    if (perm & (PROT_SHARE | PROT_COMBINE | PROT_LAZY))
+        return -E_INVAL;
+
+    return map_physical_region(&env->address_space, va, pa, size,
+                               perm | PROT_USER_ | MAP_USER_MMIO);
+}
+
 /* Try to send 'value' to the target env 'envid'.
  * If srcva < MAX_USER_ADDRESS, then also send region currently mapped at 'srcva',
  * so that receiver gets mapping.
@@ -395,8 +440,11 @@ sys_ipc_recv(uintptr_t dstva, uintptr_t maxsize) {
 static int
 sys_region_refs(uintptr_t addr, size_t size, uintptr_t addr2, uintptr_t size2) {
     // LAB 10: Your code here
+    if (addr2 >= MAX_USER_ADDRESS) {
+        return region_maxref(&curenv->address_space, addr, size);
+    }
 
-    return 0;
+    return region_maxref(&curenv->address_space, addr, size) - region_maxref(&curenv->address_space, addr2, size2);
 }
 
 /* Dispatches to the correct kernel function, passing the arguments. */
@@ -434,9 +482,13 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
         return sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (uintptr_t)a3, (size_t)a4, (int)a5);
     case SYS_ipc_recv:
         return sys_ipc_recv((uintptr_t)a1, (uintptr_t)a2);
+    // LAB 10: Your code here
+    case SYS_map_physical_region:
+        return sys_map_physical_region((uintptr_t)a1, (envid_t)a2, (uintptr_t)a3, (size_t)a4, (int)a5);
+    case SYS_region_refs:
+        return sys_region_refs((uintptr_t)a1, (size_t)a2, (uintptr_t)a3, (uintptr_t)a4);
     default:
         return -E_NO_SYS;
     }
-    // LAB 10: Your code here
     return -E_NO_SYS;
 }

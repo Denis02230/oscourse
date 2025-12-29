@@ -33,6 +33,17 @@ bc_pgfault(struct UTrapframe *utf) {
      * Hint: first round addr to page boundary. fs/nvme.c has code to read
      * the disk. */
     // LAB 10: Your code here
+    addr = (void *)ROUNDDOWN(addr, BLKSIZE);
+
+    int res = sys_alloc_region(CURENVID, addr, BLKSIZE, PROT_RW);
+    if (res)
+        panic("bc_pgfault: sys_alloc_region failed: %i\n", res);
+
+    *(uint8_t *)addr = 0; 
+
+    res = nvme_read(BLKSECTS * blockno, addr, BLKSECTS);
+    if (res != NVME_OK)
+        panic("bc_pgfault: nvme_read() failed: %i\n", res);
 
     return 1;
 }
@@ -55,8 +66,18 @@ flush_block(void *addr) {
         panic("reading non-existent block %08x out of %08x\n", blockno, super->s_nblocks);
 
     // LAB 10: Your code here.
-    (void)res;
+    addr = (void *)ROUNDDOWN(addr, BLKSIZE);
 
+    if (!is_page_present(addr) || !is_page_dirty(addr))
+        return;
+
+    res = nvme_write(BLKSECTS * blockno, addr, BLKSECTS);
+    if (res != NVME_OK)
+        panic("flush_block: nvme_write failed: %i\n", res);
+
+    res = sys_map_region(CURENVID, addr, CURENVID, addr, BLKSIZE, PTE_SYSCALL & get_prot(addr));
+    if (res)
+        panic("flush_block: sys_map_region() failed: %i\n", res);
 
     assert(!is_page_dirty(addr));
 }

@@ -60,6 +60,27 @@ alloc_block(void) {
      * super->s_nblocks blocks in the disk altogether. */
 
     // LAB 10: Your code here
+    blockno_t blkno;
+
+    for (blockno_t word_base = 0; word_base < super->s_nblocks; word_base += 32) {
+        blockno_t word_idx = word_base / 32;
+
+        if (bitmap[word_idx] == 0)
+            continue;
+
+        for (blockno_t bit = 0; bit < 32; bit++) {
+            blkno = word_base + bit;
+            if (blkno >= super->s_nblocks)
+                break;
+
+            if (!block_is_free(blkno))
+                continue;
+
+            CLRBIT(bitmap, blkno);
+            flush_block(&bitmap[word_idx]);
+            return blkno;
+        }
+    }
 
     return 0;
 }
@@ -123,9 +144,36 @@ fs_init(void) {
 int
 file_block_walk(struct File *f, blockno_t filebno, blockno_t **ppdiskbno, bool alloc) {
     // LAB 10: Your code here
+    if (filebno >= NDIRECT + NINDIRECT)
+        return -E_INVAL;
 
-    *ppdiskbno = NULL;
+    if (filebno < NDIRECT) {
+        *ppdiskbno = (blockno_t *)((char *)f->f_direct + filebno * sizeof(f->f_direct[0]));
+        return 0;
+    }
 
+    // indirect blocks
+    blockno_t indirect_idx = filebno - NDIRECT;
+
+    if (f->f_indirect == 0) {
+        if (!alloc)
+            return -E_NOT_FOUND;
+
+        blockno_t blkno = alloc_block();
+        if (blkno == 0)
+            return -E_NO_DISK;
+
+        f->f_indirect = blkno;
+
+        void *ind = diskaddr(blkno);
+        memset(ind, 0, BLKSIZE);
+        flush_block(ind);
+        flush_block(f);
+    }
+
+    blockno_t *ind = (blockno_t *)diskaddr(f->f_indirect);
+    *ppdiskbno = &ind[indirect_idx];
+    
     return 0;
 }
 
@@ -140,9 +188,31 @@ file_block_walk(struct File *f, blockno_t filebno, blockno_t **ppdiskbno, bool a
 int
 file_get_block(struct File *f, blockno_t filebno, char **blk) {
     // LAB 10: Your code here
+    blockno_t *pdiskbno = NULL;
+    int res;
 
-    *blk = NULL;
+    res = file_block_walk(f, filebno, &pdiskbno, 1);
+    if (res < 0)
+        return res;
 
+    if (*pdiskbno == 0) {
+        blockno_t blkno = alloc_block();
+        if (blkno == 0)
+            return -E_NO_DISK;
+
+        *pdiskbno = blkno;
+
+        void *va = diskaddr(blkno);
+        memset(va, 0, BLKSIZE);
+        flush_block(va);
+
+        if (filebno < NDIRECT)
+            flush_block(f);
+        else
+            flush_block(diskaddr(f->f_indirect));
+    }
+
+    *blk = (char *)diskaddr(*pdiskbno);
     return 0;
 }
 
