@@ -54,6 +54,21 @@ load_user_dwarf_info(struct Dwarf_Addrs *addrs) {
     /* Load debug sections from curenv->binary elf image */
     // LAB 8: Your code here
     (void)sections;
+
+    struct Elf *image = (struct Elf *)curenv->binary;
+    struct Secthdr *sh = (struct Secthdr *)(curenv->binary + image->e_shoff);
+    char *shstr = (char *)curenv->binary + sh[image->e_shstrndx].sh_offset;
+    
+    for (size_t i = 0; i < image->e_shnum; i++) {
+        for (size_t j = 0; j < sizeof(sections) / sizeof(*sections); j++) {
+            struct Secthdr *sh_cur = &sh[i];
+
+            if (!strcmp(shstr + sh_cur->sh_name, sections[j].name)) {
+                *sections[j].start = curenv->binary + sh_cur->sh_offset;
+                *sections[j].end = curenv->binary + sh_cur->sh_offset + sh_cur->sh_size;
+            }
+        }
+    }
 }
 
 #define UNKNOWN       "<unknown>"
@@ -82,6 +97,8 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
      * Make sure that you fully understand why it is necessary. */
 
     // LAB 8: Your code here:
+    uintptr_t old_cr3 = curenv->address_space.cr3;
+    if (old_cr3 != kspace.cr3) lcr3(kspace.cr3);
 
     /* Load dwarf section pointers from either
      * currently running program binary or use
@@ -92,7 +109,12 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
     // LAB 8: Your code here:
 
     struct Dwarf_Addrs addrs;
-    load_kernel_dwarf_info(&addrs);
+    
+    if (addr < MAX_USER_READABLE) {
+        load_user_dwarf_info(&addrs);
+    } else {
+        load_kernel_dwarf_info(&addrs);
+    }
 
     Dwarf_Off offset = 0, line_offset = 0;
     int res = info_by_address(&addrs, addr, &offset);
@@ -108,10 +130,8 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
      * address of the next instruction, so we should substract 5 from it.
      * Hint: use line_for_address from kern/dwarf_lines.c */
 
-    // LAB 2: My code here:
-    // we want addr to be pointing to the current instruction, not the next one
-    addr -= CALL_INSN_LEN;
-
+    // LAB 2: Your res here:
+    addr -= 5;
     res = line_for_address(&addrs, addr, line_offset, &info->rip_line);
     if (res < 0) goto error;
 
@@ -122,13 +142,13 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
      * Hint: info->rip_fn_name can be not NULL-terminated,
      * string returned by function_by_info will always be */
 
-    // LAB 2: My code here:
+    // LAB 2: Your res here:
     res = function_by_info(&addrs, addr, offset, &tmp_buf, &info->rip_fn_addr);
     if (res < 0) goto error;
+    strncpy(info->rip_fn_name, tmp_buf, sizeof(info->rip_fn_name));
+    info->rip_fn_namelen = strnlen(info->rip_fn_name, sizeof(info->rip_fn_name));
 
-    int max_name_len = sizeof(info->rip_fn_name);
-    strncpy(info->rip_fn_name, tmp_buf, max_name_len);
-    info->rip_fn_namelen = strnlen(info->rip_fn_name, max_name_len);
+    return 0;
 
 error:
     return res;
@@ -142,31 +162,28 @@ find_function(const char *const fname) {
      * It may also be useful to look to kernel symbol table for symbols defined
      * in assembly. */
 
-    // LAB 3: My code here:
+    // LAB 3: Your code here:
     uintptr_t offset = 0;
     struct Dwarf_Addrs addrs;
     load_kernel_dwarf_info(&addrs);
 
     int res = address_by_fname(&addrs, fname, &offset);
-    if (!res) {
-        return offset;
-    }
 
-    res = naive_address_by_fname(&addrs, fname, &offset);
-    if (!res) {
-        return offset;
-    }
+    if (res) {
+        res = naive_address_by_fname(&addrs, fname, &offset);
 
-    struct Elf64_Sym *symt;
-    char *strt = (char *)uefi_lp->StringTableStart;
-
-    for (symt = (struct Elf64_Sym *)uefi_lp->SymbolTableStart;
-         symt != (struct Elf64_Sym *)uefi_lp->SymbolTableEnd;
-         ++symt) {
-        if (!strcmp(&strt[symt->st_name], fname)) {
-            return symt->st_value;
+        if (res) {
+            struct Elf64_Sym *symt;
+            char *strt = (char *)uefi_lp->StringTableStart;
+            
+            for (symt = (struct Elf64_Sym *)uefi_lp->SymbolTableStart; 
+                symt != (struct Elf64_Sym *)uefi_lp->SymbolTableEnd; symt++) {
+                if (!strcmp(&strt[symt->st_name], fname)) {
+                    offset = (uintptr_t)symt->st_value;
+                }
+            }
         }
     }
 
-    return 0;
+    return offset;
 }

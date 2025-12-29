@@ -191,7 +191,7 @@ print_timer_error(void) {
 /* Use print_time function to print timert result
  * Use print_timer_error function to print error. */
 
-// LAB 5: My code here:
+// LAB 5: Your code here:
 
 static bool timer_started = 0;
 static int timer_id = -1;
@@ -200,59 +200,42 @@ static uint64_t freq = 0;
 
 void
 timer_start(const char *name) {
-    timer_id = -1;
-
-    for (int i = 0; i < MAX_TIMERS; i++) {
-        if (timertab[i].timer_name &&
-            strncmp(name, timertab[i].timer_name, 6) == 0) {
-            timer_id = i;
-            break;
-        }
-    }
-
-    if (timer_id == -1) {
-        print_timer_error();
-        return;
-    }
-
-    freq = timertab[timer_id].get_cpu_freq();
-    if (!freq) {
-        print_timer_error();
-        return;
-    }
-
-    timer = read_tsc();
-    timer_started = true;
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		if (timertab[i].timer_name) {
+			if (!strcmp(timertab[i].timer_name, name)) {
+				timer_started = 1;
+				timer_id = i;
+				timer = read_tsc();
+				freq = timertab[timer_id].get_cpu_freq();
+				break;
+			}
+		}
+	}
 }
 
 void
 timer_stop(void) {
-    if (!timer_started) {
-        print_timer_error();
-        return;
-    }
-
-    uint64_t tsc_end = read_tsc();
-    double elapsed_sec = (double)(tsc_end - timer) / (double)freq;
-
-    print_time(elapsed_sec);
-
-    timer_started = false;
-    timer_id = -1;
-    timer = 0;
-    freq = 0;
+	if (!timer_started) {
+		print_timer_error();
+		return;
+	}
+	timer_started = 0;
+	if (timer_id < 0) {
+		print_timer_error();
+		return;
+	}
+	timer_id = -1;
+	print_time((read_tsc() - timer) / freq);
 }
 
 void
 timer_cpu_frequency(const char *name) {
-    for (int i = 0; i < MAX_TIMERS; i++) {
-        if (timertab[i].timer_name &&
-            strncmp(name, timertab[i].timer_name, 6) == 0) {
-            uint64_t freq = timertab[i].get_cpu_freq();
-            cprintf("%lu Hz\n", freq);
-            return;
-        }
-    }
-
-    print_timer_error();
+	for (int i = 0; i < MAX_TIMERS; i++) {
+		if (timertab[i].timer_name) {
+			if (!strcmp(timertab[i].timer_name, name)) {
+				cprintf("%lu\n", timertab[i].get_cpu_freq());
+				break;
+			}
+		}
+	}
 }

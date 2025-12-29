@@ -23,9 +23,9 @@
 
 /* Functions implementing monitor commands */
 int mon_help(int argc, char **argv, struct Trapframe *tf);
-int mon_helloworld(int argc, char **argv, struct Trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
 int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
+int mon_cat(int argc, char **argv, struct Trapframe *tf) { cprintf("Meow\n"); return 0; }
 int mon_dumpcmos(int argc, char **argv, struct Trapframe *tf);
 int mon_start(int argc, char **argv, struct Trapframe *tf);
 int mon_stop(int argc, char **argv, struct Trapframe *tf);
@@ -43,9 +43,9 @@ struct Command {
 
 static struct Command commands[] = {
         {"help", "Display this list of commands", mon_help},
-        {"hw", "Print Hello World", mon_helloworld},
         {"kerninfo", "Display information about the kernel", mon_kerninfo},
         {"backtrace", "Print stack backtrace", mon_backtrace},
+        {"cat", "Do meow", mon_cat},
         {"dumpcmos", "Display CMOS contents", mon_dumpcmos},
         {"timer_start", "Start timer", mon_start},
         {"timer_stop", "Stop timer", mon_stop},
@@ -66,12 +66,6 @@ mon_help(int argc, char **argv, struct Trapframe *tf) {
 }
 
 int
-mon_helloworld(int argc, char **argv, struct Trapframe *tf) {
-    cprintf("hello world\n");
-    return 0;
-}
-
-int
 mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
     extern char _head64[], entry[], etext[], edata[], end[];
 
@@ -87,37 +81,30 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
-    // LAB 2: My code here
+    // LAB 2: Your code here
     cprintf("Stack backtrace:\n");
-
     uint64_t rbp = read_rbp();
-
     while (rbp) {
-        uint64_t rip = *((uint64_t *)(rbp + 8));
-        cprintf("  rbp %016lx  rip %016lx\n", rbp, rip);
-
+        uint64_t rip = ((uint64_t *)rbp)[1];
         struct Ripdebuginfo info;
-        if (debuginfo_rip((uintptr_t)rip, &info) == 0) {
-            cprintf("    %s:%d: %.*s+%lu\n",
-                    info.rip_file,
-                    info.rip_line,
-                    info.rip_fn_namelen,
-                    info.rip_fn_name,
-                    (uintptr_t)(rip - info.rip_fn_addr));
-        }
 
-        rbp = *((uint64_t *)(rbp));
+        cprintf("  rbp %016lx  rip %016lx\n", rbp, rip);
+        debuginfo_rip(rip, &info);
+        cprintf("         %s:%d: %.*s+%ld\n", info.rip_file, info.rip_line, info.rip_fn_namelen, info.rip_fn_name, rip - info.rip_fn_addr);
+        rbp = ((uint64_t *)rbp)[0];
     }
-
     return 0;
 }
 
 /* Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands. */
-// LAB 5: My code here:
+// LAB 5: Your code here:
 
 int
 mon_start(int argc, char **argv, struct Trapframe *tf) {
-    timer_start(argv[1]);
+    if (argc != 2) {
+		return 1;
+	}
+	timer_start(argv[1]);
     return 0;
 }
 
@@ -129,11 +116,14 @@ mon_stop(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_frequency(int argc, char **argv, struct Trapframe *tf) {
-    timer_cpu_frequency(argv[1]);
+    if (argc != 2) {
+		return 1;
+	}
+	timer_cpu_frequency(argv[1]);
     return 0;
 }
 
-// LAB 6: My code here
+// LAB 6: Your code here
 /* Implement memory (mon_memory) commands. */
 int
 mon_memory(int argc, char **argv, struct Trapframe *tf) {
@@ -145,18 +135,19 @@ mon_memory(int argc, char **argv, struct Trapframe *tf) {
  * (using dump_virtual_tree(), dump_page_table())*/
 int
 mon_pagetable(int argc, char **argv, struct Trapframe *tf) {
-    // LAB 7: My code here
+    // LAB 7: Your code here
     dump_page_table(current_space->pml4);
     return 0;
 }
 
 int
 mon_virt(int argc, char **argv, struct Trapframe *tf) {
-    // LAB 7: My code here
+    // LAB 7: Your code here
     dump_virtual_tree(current_space->root, MAX_CLASS);
     return 0;
 }
 
+// LAB 4: Your code here
 int
 mon_dumpcmos(int argc, char **argv, struct Trapframe *tf) {
     // Dump CMOS memory in the following format:
@@ -164,22 +155,16 @@ mon_dumpcmos(int argc, char **argv, struct Trapframe *tf) {
     // 10: 00 ..
     // Make sure you understand the values read.
     // Hint: Use cmos_read8()/cmos_write8() functions.
-    // LAB 4: My code here
-    for (uint8_t i = 0; i < CMOS_SIZE; i++) {
-        if (i % 16 == 0) {
-            cprintf("%02X: ", i);
-        }
-
-        cprintf("%02X ", cmos_read8(i));
-
-        if ((i + 1) % 16 == 0) {
-            cprintf("\n");
-        }
-    }
-
-    if (CMOS_SIZE % 16 != 0) {
-        cprintf("\n");
-    }
+    // LAB 4: Your code here
+    uint8_t i;
+    cprintf("00: ");
+    for (i = 0; i < CMOS_SIZE; i++) {
+		if (i % 16 == 0 && i > 0) {
+			cprintf("\n%02X: ", i);
+		}
+		cprintf("%02X ", cmos_read8(i));
+	}
+	cprintf("\n");
     return 0;
 }
 
