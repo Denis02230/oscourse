@@ -437,6 +437,52 @@ sys_ipc_recv(uintptr_t dstva, uintptr_t maxsize) {
     return 0;
 }
 
+/*
+ * This function sets trapframe and is unsafe
+ * so you need:
+ *   -Check environment id to be valid and accessible
+ *   -Check argument to be valid memory
+ *   -Use nosan_memcpy to copy from usespace
+ *   -Prevent privilege escalation by overriding segments
+ *   -Only allow program to set safe flags in RFLAGS register
+ *   -Force IF to be set in RFLAGS
+ */
+static int
+sys_env_set_trapframe(envid_t envid, struct Trapframe *tf) {
+    // LAB 11: Your code here
+	struct Env *target_env = NULL;
+	int r;
+
+	r = envid2env(envid, &target_env, 1);
+	if (r < 0) {
+		return r;
+	}
+
+	user_mem_assert(curenv, tf, sizeof(*tf), PROT_R | PROT_USER_);
+
+	nosan_memcpy(&target_env->env_tf, tf, sizeof(*tf));
+
+	// prevent privilege escalation via segment selectors
+	target_env->env_tf.tf_cs = GD_UT | 3;
+	target_env->env_tf.tf_ds = GD_UD | 3;
+	target_env->env_tf.tf_es = GD_UD | 3;
+	target_env->env_tf.tf_ss = GD_UD | 3;
+
+	// clear IOPL (and any other privileged bits), always enable interrupts
+	target_env->env_tf.tf_rflags &= ~0x3000;	// IOPL mask (bits 12-13)
+	target_env->env_tf.tf_rflags |= FL_IF;
+
+	return 0;
+}
+
+/*
+ * This function return the difference between maximal
+ * number of references of regions [addr, addr + size] and [addr2,addr2+size2]
+ * if addr2 is less than MAX_USER_ADDRESS, or just
+ * maximal number of references to [addr, addr + size]
+ *
+ * Use region_maxref() here.
+ */
 static int
 sys_region_refs(uintptr_t addr, size_t size, uintptr_t addr2, uintptr_t size2) {
     // LAB 10: Your code here
@@ -487,9 +533,11 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
         return sys_map_physical_region((uintptr_t)a1, (envid_t)a2, (uintptr_t)a3, (size_t)a4, (int)a5);
     case SYS_region_refs:
         return sys_region_refs((uintptr_t)a1, (size_t)a2, (uintptr_t)a3, (uintptr_t)a4);
+    // LAB 11: Your code here
+    case SYS_env_set_trapframe:
+        return sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
     default:
         return -E_NO_SYS;
     }
-    // LAB 11: Your code here
     return -E_NO_SYS;
 }

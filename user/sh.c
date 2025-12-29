@@ -49,6 +49,22 @@ again:
              * then close the original 'fd'. */
 
             // LAB 11: Your code here
+			fd = open(t, O_RDONLY);
+			if (fd < 0) {
+				cprintf("failed to open %s: %d\n", t, fd);
+				exit();
+			}
+
+			if (fd != 0) {
+				int r = dup(fd, 0);
+				if (r < 0) {
+					cprintf("dup %d -> 0 failed: %d\n", fd, r);
+					close(fd);
+					exit();
+				}
+				close(fd);
+			}
+            
             break;
 
         case '>': /* Output redirection */
