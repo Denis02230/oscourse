@@ -449,7 +449,7 @@ env_destroy(struct Env *env) {
 
     // LAB 3: Your code here
     env->env_status = ENV_DYING;
-        env_free(env);
+    env_free(env);
     if (curenv == env) {
         sched_yield();
     }
