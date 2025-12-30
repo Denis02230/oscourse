@@ -108,9 +108,20 @@ get_time(void) {
 
 int
 gettime(void) {
-    // LAB 12: your code here
-    int res = 0;
-    return res;
+	// LAB 12: Your code here
+	int t1, t2;
+
+	// wait until RTC is not updating
+	while (cmos_read8(RTC_AREG) & RTC_UPDATE_IN_PROGRESS)
+		;
+
+	// read twice and retry if an update happens between reads
+	do {
+		t1 = get_time();
+		t2 = get_time();
+	} while (t1 != t2);
+
+	return t1;
 }
 
 void
