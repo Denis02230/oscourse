@@ -536,6 +536,7 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
     // LAB 11: Your code here
     case SYS_env_set_trapframe:
         return sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
+    // LAB 12: Your code here
     default:
         return -E_NO_SYS;
     }
