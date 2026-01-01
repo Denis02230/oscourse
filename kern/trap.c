@@ -475,7 +475,7 @@ page_fault_handler(struct Trapframe *tf) {
     /* Force allocation of exception stack page to prevent memcpy from
      * causing pagefault during another pagefault */
     // LAB 9: Your code here:
-    force_alloc_page(&curenv->address_space, USER_EXCEPTION_STACK_TOP - PAGE_SIZE, PAGE_SIZE);
+    force_alloc_page(&curenv->address_space, USER_EXCEPTION_STACK_TOP - PAGE_SIZE, MAX_ALLOCATION_CLASS);
 
     /* Force allocate exception stack page to prevent memcpy from
      * causing pagefault during another pagefault */
@@ -517,9 +517,7 @@ page_fault_handler(struct Trapframe *tf) {
 
     /* Reset in_page_fault flag */
     // LAB 9: Your code here:
-    if (envs->env_tf.tf_trapno == T_PGFLT) {
-        in_page_fault = 0;
-    }
+    in_page_fault = 0;
 
     /* Rerun current environment */
     // LAB 9: Your code here:
