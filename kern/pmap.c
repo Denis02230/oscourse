@@ -68,7 +68,7 @@ extern char pfstacktop[], pfstack[];
 #define PAGE_IS_FREE(p) (!(p)->refc && !(p)->left && !(p)->right)
 #define PAGE_IS_UNIQ(p) ((p)->refc == 1 && !(p)->left && !(p)->right)
 
-#define INIT_DESCR 256
+#define INIT_DESCR 4096
 
 #define ABSDIFF(x, y) ((x) > (y) ? (x) - (y) : (y) - (x))
 
