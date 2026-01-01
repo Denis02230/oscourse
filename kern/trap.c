@@ -347,8 +347,20 @@ trap(struct Trapframe *tf) {
     /* #PF should be handled separately */
     if (tf->tf_trapno == T_PGFLT) {
         assert(current_space);
+        if (in_page_fault) {
+            cprintf("[PF] SECOND PF while in_page_fault=1: envid=%08x rip=%lx cr2=%lx err=%lx\n",
+                    curenv ? curenv->env_id : 0,
+                    (unsigned long)tf->tf_rip,
+                    (unsigned long)rcr2(),
+                    (unsigned long)tf->tf_err);
+        }
         assert(!in_page_fault);
         in_page_fault = 1;
+        cprintf("[PF] set in_page_fault=1: envid=%08x rip=%lx cr2=%lx err=%lx\n",
+                curenv ? curenv->env_id : 0,
+                (unsigned long)tf->tf_rip,
+                (unsigned long)rcr2(),
+                (unsigned long)tf->tf_err);
 
         uintptr_t va = rcr2();
 
@@ -459,6 +471,14 @@ page_fault_handler(struct Trapframe *tf) {
     static_assert(UTRAP_RSP == offsetof(struct UTrapframe, utf_rsp), "UTRAP_RSP should be equal to RSP offset");
 
     uintptr_t va = cr2;
+    cprintf("[PFH] enter: envid=%08x rip=%lx rsp=%lx cr2=%lx err=%lx upcall=%p in_pf=%d\n",
+            curenv ? curenv->env_id : 0,
+            (unsigned long)tf->tf_rip,
+            (unsigned long)tf->tf_rsp,
+            (unsigned long)va,
+            (unsigned long)tf->tf_err,
+            curenv ? curenv->env_pgfault_upcall : 0,
+            in_page_fault);
     if (!curenv->env_pgfault_upcall) {
         if (trace_pagefaults) {
             cprintf("<%p> user fault ip=%08lX va=%08lX err=%c%c%c%c%c\n", current_space, tf->tf_rip, va,
@@ -475,7 +495,14 @@ page_fault_handler(struct Trapframe *tf) {
     /* Force allocation of exception stack page to prevent memcpy from
      * causing pagefault during another pagefault */
     // LAB 9: Your code here:
-    force_alloc_page(&curenv->address_space, USER_EXCEPTION_STACK_TOP - PAGE_SIZE, PAGE_SIZE);
+    cprintf("[PFH] force_alloc_page(exstack) arg3=%d (should be <= %d)\n",
+            (int)PAGE_SIZE, (int)MAX_ALLOCATION_CLASS);
+    // force_alloc_page(&curenv->address_space, USER_EXCEPTION_STACK_TOP - PAGE_SIZE, MAX_ALLOCATION_CLASS);
+    int fr = force_alloc_page(&curenv->address_space,
+                            USER_EXCEPTION_STACK_TOP - PAGE_SIZE,
+                            MAX_ALLOCATION_CLASS);
+    cprintf("[PFH] force_alloc_page(exstack) ret=%d\n", fr);
+
 
     /* Force allocate exception stack page to prevent memcpy from
      * causing pagefault during another pagefault */
@@ -485,11 +512,16 @@ page_fault_handler(struct Trapframe *tf) {
     // LAB 9: Your code here:
     uintptr_t cur_ux_rsp;
 
+    cprintf("[PFH] compute ux_rsp: tf_rsp=%lx\n", (unsigned long)tf->tf_rsp);
     if (tf->tf_rsp < USER_EXCEPTION_STACK_TOP && tf->tf_rsp > USER_EXCEPTION_STACK_TOP - PAGE_SIZE) {
         cur_ux_rsp = tf->tf_rsp - sizeof(uintptr_t) - sizeof(struct UTrapframe);
     } else {
         cur_ux_rsp = USER_EXCEPTION_STACK_TOP - sizeof(struct UTrapframe);
     }
+    cprintf("[PFH] ux_rsp=%lx (range exstk [%lx,%lx))\n",
+            (unsigned long)cur_ux_rsp,
+            (unsigned long)(USER_EXCEPTION_STACK_TOP - PAGE_SIZE),
+            (unsigned long)USER_EXCEPTION_STACK_TOP);
 
     user_mem_assert(curenv, (void*)cur_ux_rsp, sizeof(struct UTrapframe), PROT_W);
 
@@ -511,19 +543,28 @@ page_fault_handler(struct Trapframe *tf) {
     // LAB 9: Your code here:
     struct AddressSpace *old_as = switch_address_space(&curenv->address_space);
     set_wp(0);
+    cprintf("[PFH] memcpy UTrapframe -> %lx size=%lx\n",
+            (unsigned long)cur_ux_rsp, (unsigned long)sizeof(struct UTrapframe));
     nosan_memcpy((void *)cur_ux_rsp, (void *)&utf, sizeof(struct UTrapframe));
+    cprintf("[PFH] memcpy done\n");
     set_wp(1);
     switch_address_space(old_as);
 
     /* Reset in_page_fault flag */
     // LAB 9: Your code here:
-    if (envs->env_tf.tf_trapno == T_PGFLT) {
-        in_page_fault = 0;
-    }
+    cprintf("[PFH] before reset: in_page_fault=%d curenv=%08x tf_trapno=%ld\n",
+            in_page_fault,
+            curenv ? curenv->env_id : 0,
+            (long)tf->tf_trapno);
+    in_page_fault = 0;
 
     /* Rerun current environment */
     // LAB 9: Your code here:
     env_run(curenv);
+    cprintf("[PFH] after  reset: in_page_fault=%d (envs[0].trapno=%ld curenv.trapno=%ld)\n",
+            in_page_fault,
+            (long)envs[0].env_tf.tf_trapno,
+            (long)curenv->env_tf.tf_trapno);
     while (1)
         ;
 }
