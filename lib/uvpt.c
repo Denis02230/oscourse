@@ -63,22 +63,65 @@ foreach_shared_region(int (*fun)(void *start, void *end, void *arg), void *arg) 
 
 	int res = 0;
 
-	for (uintptr_t addr = 0; addr < MAX_USER_ADDRESS; addr += PAGE_SIZE) {
-		if (!(uvpml4[VPML4(addr)] & PTE_P) ||
-		    !(uvpdp[VPDP(addr)] & PTE_P) ||
-		    !(uvpd[VPD(addr)] & PTE_P)) {
+	uintptr_t start = 0;
+	uintptr_t end = 0;
+	int in_region = 0;
+
+	for (uintptr_t addr = 0; addr < MAX_USER_ADDRESS; ) {
+		if (!(uvpml4[VPML4(addr)] & PTE_P)) {
+			if (in_region) {
+				res = fun((void *)start, (void *)end, arg);
+				if (res) return res;
+				in_region = 0;
+			}
+			addr = (addr + (1ULL << PML4_SHIFT)) & ~((1ULL << PML4_SHIFT) - 1);
+			continue;
+		}
+		if (!(uvpdp[VPDP(addr)] & PTE_P)) {
+			if (in_region) {
+				res = fun((void *)start, (void *)end, arg);
+				if (res) return res;
+				in_region = 0;
+			}
+			addr = (addr + (1ULL << PDP_SHIFT)) & ~((1ULL << PDP_SHIFT) - 1);
+			continue;
+		}
+		if (!(uvpd[VPD(addr)] & PTE_P)) {
+			if (in_region) {
+				res = fun((void *)start, (void *)end, arg);
+				if (res) return res;
+				in_region = 0;
+			}
+			addr = (addr + (1ULL << PD_SHIFT)) & ~((1ULL << PD_SHIFT) - 1);
 			continue;
 		}
 
-		if (!(uvpt[VPT(addr)] & PTE_P) || !(uvpt[VPT(addr)] & PTE_SHARE)) {
-			continue;
+		if ((uvpt[VPT(addr)] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
+			if (!in_region) {
+				start = addr;
+				end = addr + PAGE_SIZE;
+				in_region = 1;
+			} else if (end == addr) {
+				end += PAGE_SIZE;
+			} else {
+				res = fun((void *)start, (void *)end, arg);
+				if (res) return res;
+				start = addr;
+				end = addr + PAGE_SIZE;
+			}
+		} else if (in_region) {
+			res = fun((void *)start, (void *)end, arg);
+			if (res) return res;
+			in_region = 0;
 		}
 
-		res = fun((void *)addr, (void *)(addr + PAGE_SIZE), arg);
-		if (res) {
-			return res;
-		}
+		addr += PAGE_SIZE;
 	}
 
-    return res;
+	if (in_region) {
+		res = fun((void *)start, (void *)end, arg);
+		if (res) return res;
+	}
+
+    return 0;
 }
