@@ -32,6 +32,17 @@ struct Env *envs = env_array;
 struct Env *envs = NULL;
 #endif
 
+static uint8_t fxsave_init[FXSAVE_AREA_SIZE] __attribute__((aligned(16)));
+static bool fxsave_init_done;
+
+static void
+fpstate_init_once(void) {
+    if (fxsave_init_done) return;
+    fninit();
+    fxsave64(fxsave_init);
+    fxsave_init_done = 1;
+}
+
 /* Virtual syscall page address */
 volatile int *vsys;
 
@@ -94,6 +105,8 @@ envid2env(envid_t envid, struct Env **env_store, bool need_check_perm) {
  */
 void
 env_init(void) {
+    fpstate_init_once();
+
     /* Allocate vsys array with kzalloc_region().
      * Don't forget about rounding.
      * kzalloc_region only works with current_space != NULL */
@@ -166,6 +179,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
      * of a prior environment inhabiting this Env structure
      * from "leaking" into our new environment */
     memset(&env->env_tf, 0, sizeof(env->env_tf));
+
+    memcpy(env->env_fxsave, fxsave_init, FXSAVE_AREA_SIZE);
 
     /* Set up appropriate initial values for the segment registers.
      * GD_UD is the user data (KD - kernel data) segment selector in the GDT, and
@@ -571,10 +586,12 @@ env_run(struct Env *env) {
 
     // LAB 3: Your code here
     // LAB 8: Your code here
-    if (curenv) {
-        if (curenv->env_status == ENV_RUNNING) {
+    if (curenv && curenv != env) {
+        fxsave64(curenv->env_fxsave);
+        if (curenv->env_status == ENV_RUNNING)
             curenv->env_status = ENV_RUNNABLE;
-        }
+    } else if (curenv && curenv->env_status == ENV_RUNNING) {
+        curenv->env_status = ENV_RUNNABLE;
     }
 
     curenv = env;
@@ -582,6 +599,7 @@ env_run(struct Env *env) {
     curenv->env_runs++;
 
     switch_address_space(&curenv->address_space);
+    fxrstor64(curenv->env_fxsave);
     env_pop_tf(&curenv->env_tf);
 
     while (1)

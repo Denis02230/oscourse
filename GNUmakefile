@@ -152,7 +152,6 @@ CFLAGS += -Wall -Wformat=2 -Wno-unused-function -Werror -g -gpubnames -gdwarf-4
 # Add -fno-stack-protector if the option exists.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 CFLAGS += $(EXTRA_CFLAGS)
-CFLAGS += -mno-sse -mno-sse2 -mno-mmx
 
 
 KERN_SAN_CFLAGS :=
@@ -292,6 +291,9 @@ USER_CFLAGS += -DCONFIG_KSPACE -DJOS_PROG
 else
 USER_CFLAGS += -DJOS_USER
 endif
+
+KERN_CFLAGS += -mno-sse -mno-sse2 -mno-mmx
+USER_CFLAGS += -msse -msse2 -mfpmath=sse
 
 # Update .vars.X if variable X has changed since the last make run.
 #

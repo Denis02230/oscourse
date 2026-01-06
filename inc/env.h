@@ -30,6 +30,8 @@ typedef int32_t envid_t;
 #define NENV        (1 << LOG2NENV)
 #define ENVX(envid) ((envid) & (NENV - 1))
 
+#define FXSAVE_AREA_SIZE 512
+
 /* Values of env_status in struct Env */
 enum {
     ENV_FREE,
@@ -60,6 +62,7 @@ struct AddressSpace {
 
 struct Env {
     struct Trapframe env_tf; /* Saved registers */
+    uint8_t env_fxsave[FXSAVE_AREA_SIZE] __attribute__((aligned(16)));
     struct Env *env_link;    /* Next free Env */
     envid_t env_id;          /* Unique environment identifier */
     envid_t env_parent_id;   /* env_id of this env's parent */

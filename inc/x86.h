@@ -280,4 +280,19 @@ nmi_disable(void) {
     outb(CMOS_CMD, inb(CMOS_CMD) | CMOS_NMI_LOCK);
 }
 
+static inline void __attribute__((always_inline))
+fxsave64(void *addr) {
+    asm volatile("fxsave64 (%0)" :: "r"(addr) : "memory");
+}
+
+static inline void __attribute__((always_inline))
+fxrstor64(void *addr) {
+    asm volatile("fxrstor64 (%0)" :: "r"(addr) : "memory");
+}
+
+static inline void __attribute__((always_inline))
+fninit(void) {
+    asm volatile("fninit" ::: "memory");
+}
+
 #endif /* !JOS_INC_X86_H */

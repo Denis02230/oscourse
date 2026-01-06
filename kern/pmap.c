@@ -1963,7 +1963,7 @@ init_memory(void) {
     /* Set appropriate cr0 and cr4 bits
      * (In assembly code only minimal set of modes was set)*/
     lcr0(CR0_PE | CR0_PG | CR0_AM | CR0_WP | CR0_NE | CR0_MP);
-    lcr4(CR4_PSE | CR4_PAE | CR4_PCE);
+    lcr4(CR4_PSE | CR4_PAE | CR4_PCE | CR4_OSFXSR | CR4_OSXMMEXCPT);
 
     /* Enable NX bit (execution protection) */
     uint64_t efer = rdmsr(EFER_MSR);

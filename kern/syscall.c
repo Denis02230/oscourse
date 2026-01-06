@@ -119,12 +119,16 @@ sys_exofork(void) {
     struct Env* new = NULL;
     int res = 0;
 
+    fxsave64(curenv->env_fxsave);
+
     if ((res = env_alloc(&new, curenv->env_id, ENV_TYPE_USER)) < 0) {
         return res;
     }
     new->env_status = ENV_NOT_RUNNABLE;
     new->env_tf = curenv->env_tf;
     new->env_tf.tf_regs.reg_rax = 0;
+
+    memcpy(new->env_fxsave, curenv->env_fxsave, FXSAVE_AREA_SIZE);
 
     return new->env_id;
 }
