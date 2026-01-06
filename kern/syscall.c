@@ -23,6 +23,23 @@ sys_cputs(const char *s, size_t len) {
 
     /* Check that the user has permission to read memory [s, s+len).
      * Destroy the environment if not. */
+    if (len > 0 && s == NULL) {
+        return -E_INVAL;
+    }
+    
+    uintptr_t start = (uintptr_t)s;
+    if (start + len < start) {
+        return -E_INVAL;
+    }
+    
+    if (start >= MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
+    if (start + len > MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
     user_mem_assert(curenv, s, len, PROT_R | PROT_USER_);
 
 #ifdef SANITIZE_SHADOW_BASE
@@ -110,7 +127,6 @@ sys_exofork(void) {
     new->env_tf.tf_regs.reg_rax = 0;
 
     return new->env_id;
-    return 0;
 }
 
 /* Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -192,18 +208,30 @@ sys_alloc_region(envid_t envid, uintptr_t addr, size_t size, int perm) {
     if (envid2env(envid, &new, 1) < 0) {
         return -E_BAD_ENV;
     }
+    
     if (addr >= MAX_USER_ADDRESS || addr & CLASS_MASK(0)) {
         return -E_INVAL;
     }
+    
+    if (addr + size < addr) {
+        return -E_INVAL;
+    }
+    
+    if (addr + size > MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
     if (!(perm & PROT_ALL)) {
         return -E_INVAL;
     }
+    
     if (perm & ALLOC_ONE) {
         perm = perm & ~ALLOC_ZERO;
     } else {
         perm = perm | ALLOC_ZERO;
         perm = perm & ~ALLOC_ONE;
     }
+    
     if (map_region(&new->address_space, addr, NULL, 0, size, perm | PROT_USER_ | PROT_LAZY) < 0) {
         return -E_NO_MEM;
     }
@@ -239,15 +267,35 @@ sys_map_region(envid_t srcenvid, uintptr_t srcva,
     if (envid2env(srcenvid, &src, 1) < 0 || envid2env(dstenvid, &dst, 1) < 0) {
         return -E_BAD_ENV;
     }
+    
     if (srcva >= MAX_USER_ADDRESS || srcva & CLASS_MASK(0)) {
         return -E_INVAL;
     }
+    
+    if (srcva + size < srcva) {
+        return -E_INVAL;
+    }
+    
+    if (srcva + size > MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
     if (dstva >= MAX_USER_ADDRESS || dstva & CLASS_MASK(0)) {
         return -E_INVAL;
     }
+    
+    if (dstva + size < dstva) {
+        return -E_INVAL;
+    }
+    
+    if (dstva + size > MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
     if (!(perm & PROT_ALL) || perm & ALLOC_ZERO || perm & ALLOC_ONE) {
         return -E_INVAL;
     }
+    
     if (map_region(&dst->address_space, dstva, &src->address_space, srcva, size, perm | PROT_USER_) < 0) {
         return -E_NO_MEM;
     }
@@ -270,9 +318,19 @@ sys_unmap_region(envid_t envid, uintptr_t va, size_t size) {
     if (envid2env(envid, &new, 1) < 0) {
         return -E_BAD_ENV;
     }
+    
     if (va >= MAX_USER_ADDRESS || va & CLASS_MASK(0)) {
         return -E_INVAL;
     }
+    
+    if (va + size < va) {
+        return -E_INVAL;
+    }
+    
+    if (va + size > MAX_USER_ADDRESS) {
+        return -E_INVAL;
+    }
+    
     unmap_region(&new->address_space, va, size);
     return 0;
 }
@@ -373,20 +431,39 @@ sys_ipc_try_send(envid_t envid, uint32_t value, uintptr_t srcva, size_t size, in
     if (!dst->env_ipc_recving) {
         return -E_IPC_NOT_RECV;
     }
-    if (srcva < MAX_USER_ADDRESS && srcva & CLASS_MASK(0)) {
-        return -E_INVAL;
-    }
-    if (srcva < MAX_USER_ADDRESS && dst->env_ipc_dstva < MAX_USER_ADDRESS) {
-        // page alignment
-        if (srcva & CLASS_MASK(0) || dst->env_ipc_dstva & CLASS_MASK(0)) {
+    
+    if (srcva < MAX_USER_ADDRESS) {
+        if (srcva & CLASS_MASK(0)) {
             return -E_INVAL;
         }
-        // perm check
+        
+        if (srcva + size < srcva) {
+            return -E_INVAL;
+        }
+        
+        if (srcva + size > MAX_USER_ADDRESS) {
+            return -E_INVAL;
+        }
+        
         if (!(perm & PROT_ALL) || (perm & ALLOC_ONE) || (perm & ALLOC_ZERO)) {
             return -E_INVAL;
         }
-        // trying to map region with min length to dstva
+    }
+    
+    if (srcva < MAX_USER_ADDRESS && dst->env_ipc_dstva < MAX_USER_ADDRESS) {
+        if (dst->env_ipc_dstva & CLASS_MASK(0)) {
+            return -E_INVAL;
+        }
+        
         size_t min = MIN(size, dst->env_ipc_maxsz);
+        
+        if (dst->env_ipc_dstva + min < dst->env_ipc_dstva) {
+            return -E_INVAL;
+        }
+        
+        if (dst->env_ipc_dstva + min > MAX_USER_ADDRESS) {
+            return -E_INVAL;
+        }
         
         if (map_region(&dst->address_space, dst->env_ipc_dstva, &curenv->address_space, srcva, 
                 min, perm | PROT_USER_) < 0) {
@@ -424,6 +501,14 @@ sys_ipc_recv(uintptr_t dstva, uintptr_t maxsize) {
     }
     if (dstva < MAX_USER_ADDRESS) {
         if (!maxsize || dstva & CLASS_MASK(0)) {
+            return -E_INVAL;
+        }
+        
+        if (dstva + maxsize < dstva) {
+            return -E_INVAL;
+        }
+        
+        if (dstva + maxsize > MAX_USER_ADDRESS) {
             return -E_INVAL;
         }
 
