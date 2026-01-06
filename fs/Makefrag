@@ -35,6 +35,10 @@ USERAPPS :=		$(OBJDIR)/user/init \
 			$(OBJDIR)/user/vdate \
 			$(OBJDIR)/user/fputest \
 			$(OBJDIR)/user/printfloat \
+			$(OBJDIR)/user/itask_printf_f \
+			$(OBJDIR)/user/itask_printf_width \
+			$(OBJDIR)/user/itask_printf_e \
+			$(OBJDIR)/user/itask_printf_g \
 
 
 FSIMGFILES := $(FSIMGTXTFILES) $(USERAPPS)

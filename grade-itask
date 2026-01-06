@@ -11,14 +11,34 @@ def test_runner_hello():
     r.user_test("hello", timeout=30)
     r.match(r"hello, world")
 
-@test(45)
+@test(10)
 def test_fp_context():
     r.user_test("fputest", timeout=30)
     r.match(r"^ITASK_FPTEST: OK$")
 
-@test(45)
+@test(40)
 def test_printf_float():
     r.user_test("printfloat", timeout=30)
     r.match(r"^ITASK_PRINTF: OK$")
+
+@test(10)
+def test_printf_f():
+    r.user_test("user_itask_printf_f", timeout=30)
+    r.match(r"^ITASK_PRINTF_F: OK$")
+
+@test(10)
+def test_printf_width():
+    r.user_test("user_itask_printf_width", timeout=30)
+    r.match(r"^ITASK_PRINTF_WIDTH: OK$")
+
+@test(10)
+def test_printf_e():
+    r.user_test("user_itask_printf_e", timeout=30)
+    r.match(r"^ITASK_PRINTF_E: OK$")
+
+@test(10)
+def test_printf_g():
+    r.user_test("user_itask_printf_g", timeout=30)
+    r.match(r"^ITASK_PRINTF_G: OK$")
 
 run_tests()

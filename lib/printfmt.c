@@ -138,6 +138,7 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
         /* Process a %-escape sequence */
         char padc = ' ';
         int width = -1, precision = -1;
+        bool in_prec = 0;
         unsigned lflag = 0, base = 10;
         bool altflag = 0, zflag = 0;
         bool plusflag = 0, spaceflag = 0;
@@ -146,6 +147,10 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
 
         switch (ch = *ufmt++) {
         case '0': /* '-' flag to pad on the right */
+            if (in_prec) goto parse_num;   // treat as precision digit
+            padc = '0';
+            goto reswitch;
+        
         case '-': /* '0' flag to pad with 0's instead of spaces */
             padc = ch;
             goto reswitch;
@@ -163,13 +168,19 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
         case '7':
         case '8':
         case '9': /* width field */
+        parse_num:
             for (precision = 0;; ++ufmt) {
                 precision = precision * 10 + ch - '0';
-                if ((ch = *ufmt) - '0' > 9) break;
+                if ((unsigned)(ch = *ufmt) - '0' > 9) break;
             }
+            goto process_precision;
 
         process_precision:
-            if (width < 0) {
+            if (in_prec) {
+                // parsed precision, keep it
+                in_prec = 0;
+            } else if (width < 0) {
+                // parsed width
                 width = precision;
                 precision = -1;
             }
@@ -177,6 +188,8 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
 
         case '.':
             width = MAX(0, width);
+            in_prec = 1;
+            precision = 0;
             goto reswitch;
 
         case '#':

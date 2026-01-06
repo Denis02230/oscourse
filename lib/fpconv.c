@@ -128,15 +128,30 @@ int fp_format_f(char *out, size_t outsz, double x, fp_fmt_t fmt) {
     // scaled fractional with rounding (simple)
     uint64_t scale = pow10_u64(prec);
     uint64_t fp = 0;
-    if (prec > 0) {
-        double y = frac * (double)scale;
+
+    // compute rounding even for prec==0
+    {
+        double y = frac * (double)scale;   // when prec==0, scale==1 -> y==frac
         uint64_t fl = (uint64_t)y;
         double r = y - (double)fl;
-        if (r > 0.5) fl++;
-        else if (r == 0.5 && (fl & 1)) fl++; // ties-to-even (best effort)
+
+        if (r > 0.5) {
+            fl++;
+        } else if (r == 0.5) {
+            // ties-to-even
+            if (prec == 0) {
+                if (ip & 1) fl++;          // tie depends on integer digit
+            } else {
+                if (fl & 1) fl++;          // tie depends on last fractional digit
+            }
+        }
+
         fp = fl;
 
-        if (fp >= scale) { fp = 0; ip++; } // carry
+        if (fp >= scale) {                 // carry (also works when scale==1)
+            fp = 0;
+            ip++;
+        }
     }
 
     // write integer part
