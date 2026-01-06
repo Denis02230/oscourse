@@ -6,6 +6,7 @@ LIB_SRCFILES :=		lib/console.c \
 			lib/panic.c \
 			lib/printf.c \
 			lib/printfmt.c \
+			lib/fpconv.c \
 			lib/string.c \
 			lib/readline.c \
 			lib/syscall.c

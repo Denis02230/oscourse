@@ -18,6 +18,8 @@ void printfmt(void (*putch)(int, void *), void *putdat, const char *fmt, ...) __
 void vprintfmt(void (*putch)(int, void *), void *putdat, const char *fmt, va_list) __attribute__((format(printf, 3, 0)));
 int snprintf(char *str, size_t size, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
 int vsnprintf(char *str, size_t size, const char *fmt, va_list) __attribute__((format(printf, 3, 0)));
+int sprintf(char *str, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+int vsprintf(char *str, const char *fmt, va_list) __attribute__((format(printf, 2, 0)));
 
 /* lib/printf.c */
 int cprintf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));

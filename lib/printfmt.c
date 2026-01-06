@@ -7,6 +7,7 @@
 #include <inc/string.h>
 #include <inc/stdarg.h>
 #include <inc/error.h>
+#include <inc/fpconv.h>
 
 /*
  * Space or zero padding and a field width are supported for the numeric
@@ -63,6 +64,28 @@ print_num(void (*putch)(int, void *), void *put_arg,
     putch(dig[num % base], put_arg);
 }
 
+static void
+print_padded_str(void (*putch)(int, void *), void *put_arg,
+                 const char *s, int width, char padc)
+{
+    int len = (int)strnlen(s, 1<<30);
+
+    // left pad
+    if (width > 0 && padc != '-') {
+        int w = width - len;
+        while (w-- > 0) putch(padc, put_arg);
+    }
+
+    // body
+    while (*s) putch(*s++, put_arg);
+
+    // right pad
+    if (width > 0 && padc == '-') {
+        int w = width - len;
+        while (w-- > 0) putch(' ', put_arg);
+    }
+}
+
 /* Get an unsigned int of various possible sizes from a varargs list,
  * depending on the lflag parameter. */
 static uintmax_t
@@ -117,6 +140,7 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
         int width = -1, precision = -1;
         unsigned lflag = 0, base = 10;
         bool altflag = 0, zflag = 0;
+        bool plusflag = 0, spaceflag = 0;
         uintmax_t num = 0;
     reswitch:
 
@@ -157,6 +181,14 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
 
         case '#':
             altflag = 1;
+            goto reswitch;
+        
+        case '+':
+            plusflag = 1;
+            goto reswitch;
+
+        case ' ':
+            spaceflag = 1;
             goto reswitch;
 
         case 'l': /* long flag (doubled for long long) */
@@ -205,11 +237,20 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
 
         case 'd': /* (signed) decimal */ {
             intmax_t i = get_int(&aq, lflag, zflag);
+
             if (i < 0) {
                 putch('-', put_arg);
+                if (width > 0) width--;
                 i = -i;
+            } else if (plusflag) {
+                putch('+', put_arg);
+                if (width > 0) width--;
+            } else if (spaceflag) {
+                putch(' ', put_arg);
+                if (width > 0) width--;
             }
-            num = i;
+
+            num = (uintmax_t)i;
             /* base = 10; */
             goto number;
         }
@@ -239,6 +280,52 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
         number:
             print_num(putch, put_arg, num, base, width, padc, ch == 'X');
             break;
+        
+        case 'F':
+        case 'f':
+        case 'E':
+        case 'e':
+        case 'G':
+        case 'g': {
+            double x = va_arg(aq, double);
+
+            fp_fmt_t fmt = {
+                .precision = precision,
+                .alt = altflag,
+                .plus = plusflag,
+                .space = spaceflag,
+                .upper = (ch == 'F' || ch == 'E' || ch == 'G'),
+            };
+
+            char tmp[256];
+            int n = -E_INVAL;
+
+            if (ch == 'f' || ch == 'F') n = fp_format_f(tmp, sizeof(tmp), x, fmt);
+            else if (ch == 'e' || ch == 'E') n = fp_format_e(tmp, sizeof(tmp), x, fmt);
+            else n = fp_format_g(tmp, sizeof(tmp), x, fmt);
+
+            if (n < 0) {
+                // fallback
+                strncpy(tmp, "(fp_err)", sizeof(tmp));
+                tmp[sizeof(tmp)-1] = 0;
+            }
+
+            // special-case: zero-padding with sign should keep sign first.
+            if (width > 0 && padc == '0' && (tmp[0] == '+' || tmp[0] == '-' || tmp[0] == ' ')) {
+                // emit sign
+                putch(tmp[0], put_arg);
+                // pad zeros for the rest
+                int len = (int)strnlen(tmp, sizeof(tmp));
+                int w = width - len;
+                while (w-- > 0) putch('0', put_arg);
+                // emit rest
+                for (int i = 1; tmp[i]; i++) putch(tmp[i], put_arg);
+                break;
+            }
+
+            print_padded_str(putch, put_arg, tmp, width, padc);
+            break;
+        }
 
         case '%': /* escaped '%' character */
             putch(ch, put_arg);
@@ -296,6 +383,40 @@ snprintf(char *buf, size_t n, const char *fmt, ...) {
 
     va_start(ap, fmt);
     int rc = vsnprintf(buf, n, fmt, ap);
+    va_end(ap);
+
+    return rc;
+}
+
+struct vsprintbuf {
+    char *cur;
+    int count;
+};
+
+static void
+vsprintputch(int ch, struct vsprintbuf *state) {
+    state->count++;
+    *state->cur++ = ch;
+}
+
+int
+vsprintf(char *buf, const char *fmt, va_list ap) {
+    if (!buf) return -E_INVAL;
+
+    struct vsprintbuf state = {buf, 0};
+
+    vprintfmt((void *)vsprintputch, &state, fmt, ap);
+
+    *state.cur = '\0';
+    return state.count;
+}
+
+int
+sprintf(char *buf, const char *fmt, ...) {
+    va_list ap;
+
+    va_start(ap, fmt);
+    int rc = vsprintf(buf, fmt, ap);
     va_end(ap);
 
     return rc;

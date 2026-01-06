@@ -30,6 +30,7 @@ KERN_SRCFILES := kern/bootstrap.S \
 			kern/syscall.c \
 			kern/kdebug.c \
 			lib/printfmt.c \
+			lib/fpconv.c \
 			lib/readline.c \
 			lib/string.c \
 			kern/tsc.c \
@@ -156,6 +157,13 @@ $(OBJDIR)/llvm/ubsan/%.o: llvm/ubsan/%.c $(OBJDIR)/.vars.KERN_CFLAGS
 # Special flags for kern/init
 $(OBJDIR)/kern/init.o: override KERN_CFLAGS+=$(INIT_CFLAGS)
 $(OBJDIR)/kern/init.o: $(OBJDIR)/.vars.INIT_CFLAGS
+
+# Special flags for float-capable printfmt in kernel
+FP_PRINTF_CFLAGS := -msse -msse2 -mfpmath=sse
+$(OBJDIR)/kern/printfmt.o: override KERN_CFLAGS += $(FP_PRINTF_CFLAGS)
+$(OBJDIR)/kern/printfmt.o: $(OBJDIR)/.vars.FP_PRINTF_CFLAGS
+$(OBJDIR)/kern/fpconv.o: override KERN_CFLAGS += $(FP_PRINTF_CFLAGS)
+$(OBJDIR)/kern/fpconv.o: $(OBJDIR)/.vars.FP_PRINTF_CFLAGS
 
 # How to build the kernel itself
 $(OBJDIR)/kern/kernel: $(KERN_OBJFILES) $(KERN_BINFILES) kern/kernel.ld \
