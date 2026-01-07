@@ -68,8 +68,10 @@ static void
 print_padded_str(void (*putch)(int, void *), void *put_arg,
                  const char *s, int width, char padc)
 {
-    int len = (int)strnlen(s, 1<<30);
-
+    int len = 0;
+    if (width > 0) {
+        len = (int)strnlen(s, (size_t)width + 1);
+    }
     // left pad
     if (width > 0 && padc != '-') {
         int w = width - len;
@@ -318,25 +320,39 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
             else n = fp_format_g(tmp, sizeof(tmp), x, fmt);
 
             if (n < 0) {
-                // fallback
-                strncpy(tmp, "(fp_err)", sizeof(tmp));
-                tmp[sizeof(tmp)-1] = 0;
+                strlcpy(tmp, "(fp_err)", sizeof(tmp));
+                n = (int)strnlen(tmp, sizeof(tmp));
             }
 
-            // special-case: zero-padding with sign should keep sign first.
-            if (width > 0 && padc == '0' && (tmp[0] == '+' || tmp[0] == '-' || tmp[0] == ' ')) {
-                // emit sign
+            // clamp + force terminator so nothing can scan forever
+            if (n >= (int)sizeof(tmp)) n = (int)sizeof(tmp) - 1;
+            tmp[n] = 0;
+
+            int len = n;
+
+            // sign + zero-pad: keep sign first
+            if (width > 0 && padc == '0' && len > 0 && (tmp[0] == '+' || tmp[0] == '-' || tmp[0] == ' ')) {
                 putch(tmp[0], put_arg);
-                // pad zeros for the rest
-                int len = (int)strnlen(tmp, sizeof(tmp));
                 int w = width - len;
                 while (w-- > 0) putch('0', put_arg);
-                // emit rest
-                for (int i = 1; tmp[i]; i++) putch(tmp[i], put_arg);
+                for (int i = 1; i < len; i++) putch(tmp[i], put_arg);
                 break;
             }
 
-            print_padded_str(putch, put_arg, tmp, width, padc);
+            // left pad
+            if (width > 0 && padc != '-') {
+                int w = width - len;
+                while (w-- > 0) putch(padc, put_arg);
+            }
+
+            // body: print exactly len bytes
+            for (int i = 0; i < len; i++) putch(tmp[i], put_arg);
+
+            // right pad
+            if (width > 0 && padc == '-') {
+                int w = width - len;
+                while (w-- > 0) putch(' ', put_arg);
+            }
             break;
         }
 

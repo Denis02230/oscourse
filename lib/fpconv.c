@@ -85,8 +85,8 @@ static int write_sign(char *out, size_t outsz, double x, fp_fmt_t fmt) {
 }
 
 static int append(char *out, size_t outsz, const char *s) {
-    size_t a = strnlen(out, outsz);
-    size_t b = strnlen(s, outsz);
+    size_t a = strlen(out);
+    size_t b = strlen(s);
     if (a + b + 1 > outsz) return -E_INVAL;
     memmove(out + a, s, b + 1);
     return 0;
