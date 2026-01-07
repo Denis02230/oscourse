@@ -16,7 +16,7 @@ def test_fp_context():
     r.user_test("fputest", timeout=30)
     r.match(r"^ITASK_FPTEST: OK$")
 
-@test(40)
+@test(10)
 def test_printf_float():
     r.user_test("printfloat", timeout=30)
     r.match(r"^ITASK_PRINTF: OK$")
@@ -40,5 +40,10 @@ def test_printf_e():
 def test_printf_g():
     r.user_test("user_itask_printf_g", timeout=30)
     r.match(r"^ITASK_PRINTF_G: OK$")
+
+@test(30)
+def test_musl_snprintf_fp():
+    r.user_test("user_itask_musl_snprintf_fp", timeout=30)
+    r.match(r"^ITASK_MUSL_SNPRINTF_FP: OK$")
 
 run_tests()
