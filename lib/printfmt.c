@@ -310,7 +310,7 @@ vprintfmt(void (*putch)(int, void *), void *put_arg, const char *fmt, va_list ap
                 .upper = (ch == 'F' || ch == 'E' || ch == 'G'),
             };
 
-            char tmp[256];
+            char tmp[512];
             int n = -E_INVAL;
 
             if (ch == 'f' || ch == 'F') n = fp_format_f(tmp, sizeof(tmp), x, fmt);

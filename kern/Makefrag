@@ -31,6 +31,7 @@ KERN_SRCFILES := kern/bootstrap.S \
 			kern/kdebug.c \
 			lib/printfmt.c \
 			lib/fpconv.c \
+			lib/ryu_d2printf.c \
 			lib/readline.c \
 			lib/string.c \
 			kern/tsc.c \
