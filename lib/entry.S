@@ -49,6 +49,7 @@ _start:
 args_exist:
     movq 8(%rsp), %rsi
     movq (%rsp), %rdi
+    andq $-16, %rsp
     xorl %ebp, %ebp
     call libmain
     jmp .
