@@ -155,16 +155,16 @@ devfile_write(struct Fd *fd, const void *buf, size_t n) {
     int res = 0;
 
     while (res0 < n) {
-        size_t next = MIN(n, sizeof(fsipcbuf.write.req_buf));
+        size_t remain = n - res0;
+        size_t next = MIN(remain, sizeof(fsipcbuf.write.req_buf));
+
         memcpy(fsipcbuf.write.req_buf, buf, next);
         fsipcbuf.write.req_fileid = fd->fd_file.id;
         fsipcbuf.write.req_n = next;
 
         res = fsipc(FSREQ_WRITE, NULL);
-        
-        if (res < 0) {
-            return res;
-        }
+        if (res < 0) return res;
+        if (res == 0) return (ssize_t)res0;
 
         buf += res;
         res0 += res;
